@@ -1,0 +1,209 @@
+---
+title: "Question 03 part i"
+output: html_document
+date: "2024-04-02"
+---
+
+```{r}
+# importing a necessary library
+library(dplyr)
+```
+
+```{r}
+# Setting the working directory 
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files")
+data_2007 <- read.csv("data_2007.csv")
+```
+
+```{r}
+# Setting the working directory 
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files")
+airport_data <- read.csv("airport_data.csv")
+```
+
+```{r}
+# viewing the first few records of the data set
+head(data_2007)
+```
+
+```{r}
+# dependent variable is categorical
+divert_counts <- table(data_2007$Diverted); divert_counts
+```
+# Imputation of the null values
+```{r}
+colSums(is.na(data_2007))
+```
+
+```{r}
+columns_with_null_values <- colnames(data_2007)[apply(data_2007, 2, anyNA)]
+print(columns_with_null_values)
+```
+# in R, the column 'TailNum' for any presence of missing values is not returned, but after looking they are empty cells. 
+# However, the distribution is not checked since it does have any impact to the model
+```{r}
+# Columns with missing values
+columns <- c('DepTime', 'ArrTime', 'ActualElapsedTime', 'CRSElapsedTime', 'AirTime', 'ArrDelay', 'DepDelay')
+
+# Iterating over the columns containing null values to check each variable's distribution
+for (column in columns) {
+  # Checking to make sure that the null values were not removed accidently
+  if (anyNA(data_2007[[column]])) {
+    # Histogram for column
+    hist(data_2007[[column]], main = paste('Distribution of', column), xlab = 'Values', ylab = 'Frequency', breaks = 100)
+  }
+}
+```
+#the variables resembling uniform distibution will be imputed using the mean and the skewed ones with median the column 'TailNum' will be ignored as it is a alphanumeric code used for identification
+```{r}
+# data cleaning for missing values through imputation
+
+# uniformly distributed variables
+data_2007$ArrTime[is.na(data_2007$ArrTime)] <- mean(data_2007$ArrTime, na.rm = TRUE)
+data_2007$DepTime[is.na(data_2007$DepTime)] <- mean(data_2007$DepTime, na.rm = TRUE)
+
+# skewed distributions
+data_2007$ActualElapsedTime[is.na(data_2007$ActualElapsedTime)] <- median(data_2007$ActualElapsedTime, na.rm = TRUE)
+data_2007$CRSElapsedTime[is.na(data_2007$CRSElapsedTime)] <- median(data_2007$CRSElapsedTime, na.rm = TRUE)
+data_2007$AirTime[is.na(data_2007$AirTime)] <- median(data_2007$AirTime, na.rm = TRUE)
+data_2007$ArrDelay[is.na(data_2007$ArrDelay)] <- median(data_2007$ArrDelay, na.rm = TRUE)
+data_2007$DepDelay[is.na(data_2007$DepDelay)] <- median(data_2007$DepDelay, na.rm = TRUE)
+```
+
+```{r}
+# rechecking to confirm if the missing values have been imputed
+colSums(is.na(data_2007))
+```
+
+```{r}
+names(data_2007)
+```
+
+```{r}
+filtered_data_2007 <- data_2007[, c('Diverted', 'Month', 'DayofMonth', 'DayOfWeek', 'CRSDepTime',
+                                     'CRSArrTime', 'DepDelay', 'UniqueCarrier', 'Origin', 'Dest', 'Distance', 'Cancelled', 
+                                     'CarrierDelay', 'WeatherDelay', 'NASDelay', 'SecurityDelay', 'LateAircraftDelay', 'TailNum')]
+```
+
+```{r}
+# a view of the first few records of the airport data set
+head(airport_data)
+# column names of the airport data set
+names(airport_data)
+```
+# it was found by observation that the column 'iata' in the airport dataset is similar to the Origin and Dest columns in the filtered 2007 dataset. further information about coordinates can be extracted
+
+# Merging the datasets based on appropriate columns
+```{r}
+# renaming the column 'Dest' in filtered_data_2007 to 'iata'
+names(filtered_data_2007)[names(filtered_data_2007) == 'Dest'] <- 'iata'
+
+# Print the first row of the modified data frame to check the column names
+print(head(filtered_data_2007, 1))
+```
+
+```{r}
+# combining the airport data set and the filtered_data_2007 set
+# using 'iata' and 'Origin' columns to merge to info about destination coordinates
+merged_set_v1 <- merge(filtered_data_2007, airport_data[, c('iata', 'lat', 'long')], by = 'iata', all.x = TRUE)
+print(head(merged_set_v1))
+```
+
+```{r}
+# renaming the columns lat and long to dest lat and long to get the specific coordinates
+colnames(merged_set_v1)[which(colnames(merged_set_v1) == 'lat')] <- 'Dest lat'
+colnames(merged_set_v1)[which(colnames(merged_set_v1) == 'long')] <- 'Dest long'
+
+print(head(merged_set_v1))
+```
+# remerging the datasets using 'iata' column to get the origin coordinates
+```{r}
+# Removing the 'iata' column from the merged data frame
+
+merged_set_v1 <- subset(merged_set_v1, select = -c(iata))
+print(head(merged_set_v1))
+
+```
+
+```{r}
+# renaming the column 'Origin' in filtered_data_2007 to 'iata'
+colnames(merged_set_v1)[colnames(merged_set_v1) == 'Origin'] <- 'iata'
+print(head(merged_set_v1))
+```
+
+```{r}
+# combining the airport data set and the merged_set_v1
+
+# re-merging with airport data set
+airport_columns <- c('iata', 'airport', 'lat', 'long')
+merged_set_v2 <- merge(merged_set_v1, airport_data[, airport_columns], by = 'iata', all.x = TRUE)
+head(merged_set_v2)
+```
+
+```{r}
+# renaming the columns lat and long to dest lat and long to get the specific coordinates
+merged_set_v2 <- merged_set_v2 %>% rename('Origin lat' = lat, 'Origin long' = long)
+
+# Removing the 'iata' column from the merged DataFrame
+merged_set_v2 <- merged_set_v2 %>% select(-iata)
+```
+
+```{r}
+# Encoding the Categorical variable, 'UniqueCarrier'
+table(merged_set_v2$UniqueCarrier)
+```
+# Encoding categorical variables
+```{r}
+# Setting the data type to factor before ENCODING the column
+merged_set_v2$UniqueCarrier <- factor(merged_set_v2$UniqueCarrier)
+
+merged_set_v2$UniqueCarrier_Encoded <- as.integer(merged_set_v2$UniqueCarrier)
+
+# Removing the 'UniqueCarrier' column
+merged_set_v3 <- merged_set_v2[, -which(names(merged_set_v2) == 'UniqueCarrier')]
+print(merged_set_v3)
+```
+
+```{r}
+# Encoding 'airport' column datatype to factor
+merged_set_v2$airport <- factor(merged_set_v2$airport)
+merged_set_v2$airport_Encoded <- as.integer(merged_set_v2$airport)
+
+# removing the airport column
+merged_set_v3 <- merged_set_v2[, -which(names(merged_set_v2) == 'airport')]
+# removing the Uniquecarrier column
+merged_set_v3 <- merged_set_v3[, -which(names(merged_set_v3) == 'UniqueCarrier')]
+print(merged_set_v3)
+```
+
+```{r}
+# encoding the date attributes
+# Setting the data type to factor and ENCODING the resulting column 
+
+merged_set_v3$Month_Encoded <- as.integer(as.factor(merged_set_v3$Month))
+merged_set_v3$DayofMonth_Encoded <- as.integer(as.factor(merged_set_v3$DayofMonth))
+merged_set_v3$DayOfWeek_Encoded <- as.integer(as.factor(merged_set_v3$DayOfWeek))
+
+merged_set_v4 <- merged_set_v3[, !(names(merged_set_v3) %in% c('Month', 'DayofMonth', 'DayOfWeek'))]
+
+head(merged_set_v4)
+```
+
+```{r}
+# converting the variables datatype to factor
+merged_set_v4$Diverted <- as.integer(as.factor(merged_set_v2$Diverted))
+merged_set_v4$Cancelled <- as.integer(as.factor(merged_set_v2$Cancelled))
+```
+
+```{r}
+# getting the necessary columns for the model
+
+columns_for_model <- merged_set_v4[c('Diverted', 'CRSDepTime', 'CRSArrTime', 'Distance', 'Cancelled', 'CarrierDelay', 'DepDelay', 
+                                     'WeatherDelay', 'NASDelay', 'SecurityDelay', 'LateAircraftDelay', 'Origin lat', 'Origin long', 
+                                     'Dest lat', 'Dest long', 'UniqueCarrier_Encoded', 'airport_Encoded', 'Month_Encoded', 'DayOfWeek_Encoded')]
+```
+
+```{r}
+# saving the file
+write.csv(columns_for_model, file = "D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R files/columns_for_model.csv", row.names = FALSE)
+```

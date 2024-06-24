@@ -1,0 +1,215 @@
+---
+title: "Question 2 Final"
+output: html_document
+date: "2024-03-25"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# importing the necessary cleaned files
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files/")
+data_2007 <- read.csv("data_2007.csv")
+```
+
+```{r}
+head(data_2007)
+```
+
+```{r}
+# loading the additional data set to get more information about planes' manufactured dates
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files/")
+plane_data <- read.csv("plane_data.csv")
+```
+
+```{r}
+# a view of the data
+head(plane_data)
+```
+
+```{r}
+# renaming the column so that it is the same in both data sets (gives the same information)
+plane_data <- rename(plane_data, TailNum = tailnum)
+head(plane_data)
+```
+
+```{r}
+# filtering the necessary columns 
+filtered_set_v3 <- data_2007[, c("Year", "DepTime", "CRSDepTime", "ArrDelay", "DepDelay", "FlightNum", "TailNum", 'CarrierDelay', 'WeatherDelay', 
+                                     'NASDelay', 'SecurityDelay', 'LateAircraftDelay')]
+head(filtered_set_v3)
+```
+
+```{r}
+# combining the the two data sets using the the common column "TailNum", where the IDs are matching
+merged_set <- merge(filtered_set_v3, plane_data, by = "TailNum", all = FALSE)
+print(merged_set)
+```
+
+```{r}
+# checking for any null values in the merged set
+colSums(is.na(merged_set))
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.show='asis')
+library(tidyverse)
+```
+
+```{r}
+# Looping through each column with missing values to check the distribution
+columns <- c('DepTime', 'ArrDelay', 'DepDelay')
+for (column in columns) {
+  # Confirming if the column contains any missing values
+  if (anyNA(data_2007[[column]])) {
+    # Removing any rows with missing values for plotting
+    data_plot <- data_2007[!is.na(data_2007[[column]]), ]
+    
+    print(
+      ggplot(data_plot, aes_string(x = column)) +
+      geom_histogram(bins = 60, fill = "skyblue", color = "black") +
+      labs(title = paste("Distribution of", column),
+           x = "Values", y = "Frequency") +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 12),
+            axis.text = element_text(size = 10),
+            axis.title = element_text(size = 10))
+    )
+  }
+}
+```
+
+```{r}
+# Impute missing values in DepTime using mean due to uniform distribution
+merged_set$DepTime[is.na(merged_set$DepTime)] <- mean(merged_set$DepTime, na.rm = TRUE)
+
+# Impute missing values in ArrDelay and DepDelay using median due to skewness
+merged_set$ArrDelay[is.na(merged_set$ArrDelay)] <- median(merged_set$ArrDelay, na.rm = TRUE)
+merged_set$DepDelay[is.na(merged_set$DepDelay)] <- median(merged_set$DepDelay, na.rm = TRUE)
+```
+
+```{r}
+# rechecking if all null values have got imputed in the merged set
+colSums(is.na(merged_set))
+```
+
+```{r}
+head(merged_set)
+```
+
+```{r}
+# renaming the column 'year' with MFR year (Manufacturing Year)
+merged_set <- merged_set %>%
+  rename(`MFR Year` = year) %>%
+  mutate(`MFR Year` = round(`MFR Year`))
+
+# Converting 'MFR Year' data type to integer
+merged_set$`MFR Year` <- as.integer(merged_set$`MFR Year`)
+head(merged_set)
+```
+
+```{r}
+# excluding the column 'status' since all are valid
+merged_set <- merged_set %>% select(-status)
+```
+
+```{r}
+# adding a new column to assess the age
+mmerged_set <- merged_set %>%
+  mutate(across(c(Year, `MFR Year`), as.numeric))
+
+# Calculate 'Age' column as the difference between 'Year' and 'MFR Year'
+merged_set <- merged_set %>%
+  mutate(Age = Year - `MFR Year`)
+head(merged_set)
+```
+
+```{r}
+# sorting the ages in ascending order
+print(table(merged_set$Age))
+```
+
+```{r}
+# Filtering the records with valid ages
+filtered_merged_set <- merged_set %>%
+  filter(Age >= 0 & Age <= 150)
+
+# Displaying the merged set again after removal of all records with invalid ages
+print(table(filtered_merged_set$Age))
+```
+# when age = 0, number of planes = 87337 
+# plane data had 3 more records when cleaned in R than when it was from python
+# all the other values coincide
+
+```{r}
+# grouping the data by unique Ages 
+grouped_data <- filtered_merged_set %>% group_by(Age) %>%
+  summarize(ArrDelay = mean(ArrDelay, na.rm = TRUE),
+            DepDelay = mean(DepDelay, na.rm = TRUE),
+            CarrierDelay = mean(CarrierDelay, na.rm = TRUE),
+            WeatherDelay = mean(WeatherDelay, na.rm = TRUE),
+            NASDelay = mean(NASDelay, na.rm = TRUE),
+            SecurityDelay = mean(SecurityDelay, na.rm = TRUE),
+            LateAircraftDelay = mean(LateAircraftDelay, na.rm = TRUE))
+```
+
+```{r}
+grouped_data <- filtered_merged_set %>%
+  group_by(Age) %>%
+  summarize(ArrDelay = mean(ArrDelay, na.rm = TRUE),
+            DepDelay = mean(DepDelay, na.rm = TRUE))
+
+# Calculating Total Delay
+grouped_data <- grouped_data %>%
+  mutate(TotDelay = ArrDelay + DepDelay)
+
+# Print the grouped data with total delay
+print(grouped_data)
+```
+
+```{r, fig.height = 6, fig.width = 10}
+ggplot(grouped_data, aes(x = Age)) +
+  geom_line(aes(y = ArrDelay, color = 'Arrival Delay'), linewidth = 1) +
+  geom_line(aes(y = DepDelay, color = 'Departure Delay'), linewidth = 1) +
+  geom_line(aes(y = TotDelay, color = 'Total Delay'), linewidth = 1.5) +
+  labs(x = 'Age of Plane (years)', y = 'Mean Delay (minutes)', color = '') +
+  theme_minimal() +
+  scale_color_manual(values = c('Arrival Delay' = 'orangered', 'Departure Delay' = 'deepskyblue', 'Total Delay' = 'limegreen')) +
+  theme(legend.position = 'top', plot.title = element_text(hjust = 0.5, size = 20)) +
+  guides(color = guide_legend(override.aes = list(linewidth = 3))) +
+  geom_hline(yintercept = 0, linetype = 'dotted', color = 'gray') +
+  ggtitle('Mean Delay vs. Age of Planes')
+```
+
+```{r}
+# a filtered set with all delay variables to study any relationships further
+# Grouping the data by Age and calculating mean delays
+filtered_merged_set_v2 <- filtered_merged_set %>%
+  group_by(Age) %>%
+  summarize(
+    ArrDelay = mean(ArrDelay, na.rm = TRUE),
+    DepDelay = mean(DepDelay, na.rm = TRUE),
+    CarrierDelay = mean(CarrierDelay, na.rm = TRUE),
+    WeatherDelay = mean(WeatherDelay, na.rm = TRUE),
+    NASDelay = mean(NASDelay, na.rm = TRUE),
+    SecurityDelay = mean(SecurityDelay, na.rm = TRUE),
+    LateAircraftDelay = mean(LateAircraftDelay, na.rm = TRUE)
+  ) %>%
+  mutate(TotDelay = ArrDelay + DepDelay)
+
+print(filtered_merged_set_v2)
+```
+
+```{r}
+# checking for any correlations between Age and other Delay factors
+library(corrplot)
+library(viridis)
+# Calculate the correlation matrix
+corr_matrix <- cor(filtered_merged_set_v2)
+
+# Plot the heat map
+corrplot(corr_matrix, method = "color", type = "upper", tl.col = "black", tl.srt = 45, col = viridis::viridis(100), addCoef.col = "black")
+```

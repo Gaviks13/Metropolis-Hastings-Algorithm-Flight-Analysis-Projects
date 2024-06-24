@@ -1,0 +1,316 @@
+---
+title: "Question 1"
+output: html_document
+date: "2024-03-27"
+---
+
+```{r}
+# importing the necessary libraries
+
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tibble)
+```
+
+```{r}
+# Setting the working directory 
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files")
+data_2007 <- read.csv("data_2007.csv")
+```
+
+```{r}
+# displaying the first few records of the data set
+head(data_2007)
+```
+
+```{r}
+# columns that have no relevancy for flight delays
+exclude <- c('FlightNum', 'TailNum', 'Distance', 'TaxiIn', 'TaxiOut', 'Cancelled', 'Diverted')
+
+# filtering the necessary columns for the question
+filtered_set_v1 <- data_2007 %>% select(-one_of(exclude))
+print(filtered_set_v1)
+```
+
+```{r}
+# checking the number of records with null values
+print(colSums(is.na(filtered_set_v1)))
+```
+
+```{r}
+# removal of all records with missing values
+filtered_set_v1 <- na.omit(filtered_set_v1)
+
+# the number of rows and columns in the data set after removing the null values
+dim(filtered_set_v1)
+```
+
+```{r}
+# getting a readable summary of a few statistics
+summary_stats <- summary(filtered_set_v1)
+readable_summary <- format(summary_stats, digits = 2, scientific = FALSE)
+readable_summary
+```
+# SUMMARY OF THE DELAY COMPONENTS BASED ON MEAN
+```{r}
+# getting a summary of the effects caused by every type of delay recorded
+subset_data <- filtered_set_v1[, c('DayOfWeek', 'ArrDelay', 'DepDelay', 'CarrierDelay', 'WeatherDelay', 'NASDelay', 'SecurityDelay', 'LateAircraftDelay')]
+
+# Calculating the mean of delays grouped by DayOfWeek
+info_per_weekday <- aggregate(subset_data[, -1], by = list(DayOfWeek = subset_data$DayOfWeek), FUN = mean)
+print(info_per_weekday)
+```
+
+# BEST DAYS OF THE WEEK
+
+# security delay is negligible and its the same for weather delay
+```{r}
+# grouping the delays by Days of the week
+day_set_2007 <- filtered_set_v1 %>% group_by(DayOfWeek) %>%
+                summarize(ArrDelay = mean(ArrDelay, na.rm = TRUE),
+                DepDelay = mean(DepDelay, na.rm = TRUE)) %>% ungroup()
+
+print(day_set_2007)
+```
+
+```{r}
+# Calculating the total delays for each day of week by taking the sum in each row and adding the new column to the data frame
+day_set_2007 <- day_set_2007 %>% mutate(TotDelay = ArrDelay + DepDelay)
+
+# adding a column to the data frame having the days of the week
+day_set_2007$Days = c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+
+print(day_set_2007)
+```
+
+```{r, fig.height = 7, fig.width = 9}
+
+# Plotting a vertical bar chart with a color gradient getting darker as the average total delay rises
+bar_plot <- ggplot(day_set_2007, aes(x = factor(Days, levels = days), y = TotDelay, fill = TotDelay)) +
+  geom_bar(stat = "identity", color = 'black', size = 1.1) +  
+  labs(title = "Average Total Delays based on the days of the Week",
+       x = "Day of Week",
+       y = "Average Total Delay (minutes)") +
+  scale_fill_gradient(low = "white", high = "darkred") + 
+  scale_y_continuous(breaks = seq(0, max(day_set_2007$TotDelay), by = 2)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12, face = 'bold'),
+    axis.text.y = element_text(size = 12, face = 'bold'),
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.background = element_rect(fill = "lightgrey"))
+
+print(bar_plot)
+
+# saving the image 
+ggsave("Best day of the week.png", plot = bar_plot, width = 10.5, height = 9)
+```
+
+# BEST TIMES OF THE WEEK
+```{r}
+# filtering the necessary columns 
+filtered_set_v2 <- data_2007[, c("Year", "DayOfWeek", "DepTime", "CRSDepTime", "ArrDelay", "DepDelay")]
+head(filtered_set_v2)
+```
+
+```{r}
+# removal of all records with missing values
+filtered_set_v2 <- na.omit(filtered_set_v2)
+colSums(is.na(filtered_set_v2))
+```
+
+```{r}
+# Converting the CRSDepTime column to string format
+filtered_set_v2$CRSDepTime <- sprintf("%04d", filtered_set_v2$CRSDepTime)
+
+# Converting to HH:MM format
+filtered_set_v2$CRSDepTime <- paste(substr(filtered_set_v2$CRSDepTime, 1, 2), ":", substr(filtered_set_v2$CRSDepTime, 3, 4), sep = "")
+
+# Converting to datetime format to display in HH:MM
+filtered_set_v2$x_axis <- as.POSIXct(filtered_set_v2$CRSDepTime, format = "%H:%M")
+filtered_set_v2$x_axis <- format(filtered_set_v2$x_axis, format = "%H:%M")
+
+# Summing up ArrDelay and DepDelay to get TotDelay
+filtered_set_v2$TotDelay <- filtered_set_v2$ArrDelay + filtered_set_v2$DepDelay
+
+```
+
+```{r}
+head(filtered_set_v2)
+```
+
+```{r}
+# value counts of the number of records grouped under each day 
+print(sort(table(filtered_set_v2$DayOfWeek)))
+```
+
+```{r}
+# creating separate data frames to extract the data by day
+
+# DayOfWeek : Monday ==> 1
+Mon_2007_set <- filter(filtered_set_v2, DayOfWeek == 1)
+# DayOfWeek : Tuesday ==> 2
+Tue_2007_set <- filter(filtered_set_v2, DayOfWeek == 2)
+# DayOfWeek : Wednesday ==> 3
+Wed_2007_set <- filter(filtered_set_v2, DayOfWeek == 3)
+# DayOfWeek : Thursday ==> 4
+Thu_2007_set <- filter(filtered_set_v2, DayOfWeek == 4)
+# DayOfWeek : Friday ==> 5
+Fri_2007_set <- filter(filtered_set_v2, DayOfWeek == 5)
+# DayOfWeek : Saturday ==> 6
+Sat_2007_set <- filter(filtered_set_v2, DayOfWeek == 6)
+# DayOfWeek : Sunday ==> 7
+Sun_2007_set <- filter(filtered_set_v2, DayOfWeek == 7)
+```
+
+```{r}
+# extracting the best times for the year to make coordinates for plotting
+coordinates_2007 <- data.frame()
+```
+
+```{r}
+# example of an overview of a data frame created for one day
+Tue_2007_set
+```
+
+```{r}
+# converting the column to time datatype
+Mon_2007_set$x_axis <- as.POSIXct(Mon_2007_set$x_axis, format = "%H:%M")
+Tue_2007_set$x_axis <- as.POSIXct(Tue_2007_set$x_axis, format = "%H:%M")
+Wed_2007_set$x_axis <- as.POSIXct(Wed_2007_set$x_axis, format = "%H:%M")
+Thu_2007_set$x_axis <- as.POSIXct(Thu_2007_set$x_axis, format = "%H:%M")
+Fri_2007_set$x_axis <- as.POSIXct(Fri_2007_set$x_axis, format = "%H:%M")
+Sat_2007_set$x_axis <- as.POSIXct(Sat_2007_set$x_axis, format = "%H:%M")
+Sun_2007_set$x_axis <- as.POSIXct(Sun_2007_set$x_axis, format = "%H:%M")
+```
+
+```{r}
+# Time interval
+time_gap <- '1 hour'
+
+# Grouping data by time intervals to calculate median delays and making separate columns for the median times under each day
+coordinates_2007 <- data.frame(
+  x_axis = seq(from = as.POSIXct("00:00", format = "%H:%M"), 
+                to = as.POSIXct("23:00", format = "%H:%M"), 
+                by = time_gap)
+)
+
+coordinates_2007$median_delays_Mon_2007 <- Mon_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Mon_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Tue_2007 <- Tue_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Tue_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Wed_2007 <- Wed_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Wed_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Thu_2007 <- Thu_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Thu_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Fri_2007 <- Fri_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Fri_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Sat_2007 <- Sat_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Sat_2007 = median(TotDelay)) %>%
+  pull()
+
+coordinates_2007$median_delays_Sun_2007 <- Sun_2007_set %>%
+  group_by(cut(x_axis, breaks = time_gap, labels = FALSE)) %>%
+  summarise(median_delays_Sun_2007 = median(TotDelay)) %>%
+  pull()
+
+# Converting the time column 'x_axis' to HH:MM format
+coordinates_2007$x_axis <- format(as.POSIXct(coordinates_2007$x_axis, format = "%H:%M:%S"), format = "%H:%M")
+
+# display of the resulting data frame
+print(coordinates_2007)
+```
+
+```{r, fig.height = 8, fig.width = 12}
+
+# Converting the  x_axis to POSIXct format after checking if it's not already in that format
+coordinates_2007$x_axis <- as.POSIXct(coordinates_2007$x_axis, format = "%H:%M")
+
+# Creating a separate data frame for each day of the week
+Mon_data <- coordinates_2007[c("x_axis", "median_delays_Mon_2007")]
+Tue_data <- coordinates_2007[c("x_axis", "median_delays_Tue_2007")]
+Wed_data <- coordinates_2007[c("x_axis", "median_delays_Wed_2007")]
+Thu_data <- coordinates_2007[c("x_axis", "median_delays_Thu_2007")]
+Fri_data <- coordinates_2007[c("x_axis", "median_delays_Fri_2007")]
+Sat_data <- coordinates_2007[c("x_axis", "median_delays_Sat_2007")]
+Sun_data <- coordinates_2007[c("x_axis", "median_delays_Sun_2007")]
+
+# Plotting each day's data using line plots
+line_charts <- ggplot() +
+  geom_line(data = Mon_data, aes(x = x_axis, y = median_delays_Mon_2007, color = "Monday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Tue_data, aes(x = x_axis, y = median_delays_Tue_2007, color = "Tuesday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Wed_data, aes(x = x_axis, y = median_delays_Wed_2007, color = "Wednesday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Thu_data, aes(x = x_axis, y = median_delays_Thu_2007, color = "Thursday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Fri_data, aes(x = x_axis, y = median_delays_Fri_2007, color = "Friday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Sat_data, aes(x = x_axis, y = median_delays_Sat_2007, color = "Saturday"), size = 1.1, linetype = "solid") +
+  geom_line(data = Sun_data, aes(x = x_axis, y = median_delays_Sun_2007, color = "Sunday"), size = 1.1, linetype = "solid") +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.75, color = "black") +
+  labs(title = "Median Delay based on Time of Day (2007)", x = "Time (HH:MM)", y = "Median Delay (minutes)", color = "Day of Week") +
+  scale_x_datetime(date_breaks = "1 hour", date_labels = "%H:%M") +
+  scale_color_manual(values = c("Monday" = "blue", "Tuesday" = "orange", "Wednesday" = "green",
+                                 "Thursday" = "darkred", "Friday" = "purple", "Saturday" = "yellow", "Sunday" = "magenta"),
+                     labels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")) +
+  theme_minimal() +
+  theme(legend.position = 'top', plot.title = element_text(hjust = 0.5, size = 21),
+        panel.grid.major = element_line(size = 0.7, color = "gray"),
+        panel.grid.minor = element_line(size = 0.7, color = "gray"), 
+        plot.margin = margin(1, 1, 1, 1, "cm"))
+
+print(line_charts)
+
+#saving the visualization
+ggsave("median_delay_based_on_time_of_day.png", line_charts, width = 10, height = 6, units = "in", dpi = 300)
+```
+
+```{r, fig.height = 6, fig.width = 10}
+
+# Creating an empty coordinate grid to visualize the best times of the week
+summary <- plot(0, 0, type = "n", xlim = c(-1, 25), ylim = c(-1, 8), xlab = "Time(HH:MM)", ylab = "Days", 
+     main = "Best Times of the Week", cex.main = 2, xaxt = "n", yaxt = "n", bty = "n")
+
+# Time intervals for the x-axis
+times <- seq(from = as.POSIXct("00:00", format = "%H:%M"), 
+             to = as.POSIXct("23:00", format = "%H:%M"), by = "hour")
+times_labels <- format(times, "%H:%M")
+
+# Days of the week
+days <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+details <- c("Optimal Time - Optimal Flight Times", "Delays - Time Intervals with Delays")
+
+# Plotting crosses at the best times observed on each day, looking at the line chart above
+points(c(4, 4, 4, 3, 4, 4, 6, 7, 8, 4), c(0, 1, 2, 3, 3, 4, 5, 5, 5, 6), col = "blue", pch = "x", cex = 2)
+
+# Red lines indicate the time intervals with delays per day on average based on median
+lines(c(13, 23), c(0, 0), col = "red", lwd = 5)
+lines(c(16, 22), c(1, 1), col = "red", lwd = 5)
+lines(c(14, 24), c(2, 2), col = "red", lwd = 5)
+lines(c(13, 24), c(3, 3), col = "red", lwd = 5)
+lines(c(12, 24), c(4, 4), col = "red", lwd = 5)
+lines(c(13.5, 24), c(6, 6), col = "red", lwd = 5)
+
+axis(side = 1, at = seq_along(times_labels), labels = times_labels, las = 2, cex.axis = 0.8)
+axis(2, at = seq(0, 6), labels = days, cex.axis = 0.8, pos = 0.5, las = 2)
+
+abline(h = seq(0, 6, by = 1), col = "gray", lty = "dotted", lwd=2, ylim = c(-1, 4))
+abline(v = seq(1, 24, by = 1), col = "gray", lty = "dotted", lwd=2, xlim = c(0, 24))
+
+legend("top", legend = details, col = c("blue", "red"), pch = c("x", NA), lty = c(NA, 1), lwd = 2.5, cex = 1, bty = "n")
+```

@@ -1,0 +1,96 @@
+---
+title: "Data Cleaning"
+output: html_document
+date: "2024-03-26"
+---
+
+```{r}
+# setting the working directory and importing the the data set
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/Extracted years/")
+data_2007 <- read.csv("2007.csv")
+```
+
+```{r}
+# getting the shape of the data set (no of rows and columns)
+dim(data_2007)
+```
+
+```{r}
+# getting an overview of the data set by looking at the first and last 5 records
+head(data_2007)
+tail(data_2007)
+```
+
+```{r}
+# all the column names in the data set
+colnames(data_2007)
+```
+# dealing with null values
+```{r}
+# checking for any null values in the data set
+is.na(data_2007)
+colSums(is.na(data_2007))
+
+# click the downward arrow on the right to expand the output
+```
+
+```{r}
+# looking at the data set, the column 'CancellationCode', majority are empty cells hence REMOVED
+subset(data_2007, select = -CancellationCode)
+```
+
+```{r}
+# looking at additional data sets that were provided
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/Additional files/")
+plane_data <- read.csv("plane-data.csv")
+airport_data <- read.csv("airports.csv")
+```
+
+```{r}
+# checking for the column names of the plane data set
+colnames(plane_data)
+
+# checking for any null values in the plane data set
+is.na(plane_data)
+colSums((is.na(plane_data)))
+
+# click the downward arrow on the right to expand the output
+```
+
+```{r}
+# after looking at the data set, we remove any empty cells from the data set, and the records with 'None' will be removed aswell
+plane_data <- plane_data[nchar(plane_data$type) > 0, ]  # , .. choosing all the columns
+plane_data <- subset(plane_data, year != "None")
+```
+
+```{r}
+# Checking for any other rows where a column has cells with 'None'
+colnames(airport_data)
+colSums((is.na(airport_data)))
+airport_data <- na.omit(airport_data)
+```
+# dealing with duplicates
+```{r}
+# checking for any duplicates in the data sets
+
+data_2007_check <- data_2007[duplicated(data_2007), ]
+plane_data_check <- plane_data[duplicated(plane_data), ]
+airport_data_check <- airport_data[duplicated(airport_data), ]
+```
+
+```{r}
+# removing any duplicate rows
+
+data_2007 <- unique(data_2007)
+dim(data_2007)
+```
+
+```{r}
+# saving the cleaned files
+write.csv(combined_data, file = "D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files/data_2007.csv", row.names = FALSE)
+
+write.csv(airport_data, file = "D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files/airport_data.csv", row.names = FALSE)
+
+write.csv(plane_data, file = "D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R cleaned files/plane_data.csv", row.names = FALSE)
+```
+

@@ -1,0 +1,119 @@
+---
+title: "Question 03 ii"
+output: html_document
+date: "2024-04-02"
+---
+
+# Fitting a Logistic Regression Model
+
+```{r}
+# importing the necessary libraries
+library(ROSE)
+library(caret)
+library(e1071)
+library(pROC)
+library(smotefamily)
+library(glmnet)
+```
+
+```{r}
+# Setting the working directory 
+setwd("D:/User/University/Year 2/Programming for Data Science/Programming Coursework/R files")
+columns_for_model <- read.csv("columns_for_model.csv")
+```
+
+```{r}
+names(columns_for_model)
+```
+
+```{r}
+# converting the column to binary format
+columns_for_model$Diverted <- ifelse(columns_for_model$Diverted == "1", 0, 1)
+columns_for_model$Diverted[columns_for_model$Diverted == "2"] <- 0
+
+columns_for_model$Cancelled <- ifelse(columns_for_model$Cancelled == "1", 0, 1)
+columns_for_model$Cancelled[columns_for_model$Cancelled == "2"] <- 0
+
+# separating the dependent variables from the target/response variable
+X <- columns_for_model[, c('CRSDepTime', 'CRSArrTime', 'Distance', 'Cancelled', 'CarrierDelay', 'DepDelay', 
+                           'WeatherDelay', 'NASDelay', 'SecurityDelay', 'LateAircraftDelay', 'airport_Encoded',
+                           'Origin.lat', 'Origin.long', 'Dest.lat', 'Dest.long', 'UniqueCarrier_Encoded',
+                           'Month_Encoded', 'DayOfWeek_Encoded')]
+
+# converting the response variable to factor
+columns_for_model$Diverted <- as.factor(columns_for_model$Diverted)
+class(columns_for_model$Diverted)
+y <- columns_for_model$Diverted
+```
+
+```{r}
+# splitting the data into train and test while stratifying
+set.seed(13)
+
+# splitting the data for training and testing
+split_set <- createDataPartition(y, p = 0.7, list = FALSE, times = 1)
+X_train <- X[split_set, ]
+X_test <- X[-split_set, ]
+y_train <- y[split_set]
+y_test <- y[-split_set]
+```
+
+```{r}
+# the count of diverted and non-diverted data in the train dataset
+table(y_train)
+```
+```{r}
+# converting the vector of y_train to a data frame 
+y_train_dataframe <- data.frame(Diverted = y_train)
+# dataframe containing the train data
+combined_train <- cbind(X_train, y_train_dataframe)
+print(combined_train)
+```
+
+```{r}
+# converting the vector of y_test to a data frame
+y_test_dataframe <- data.frame(Diverted = y_test)
+# data frame containing the test data
+combined_test <- cbind(X_test, y_test_dataframe)
+
+# oversampling the data in the minority class due to class imbalance
+oversampled_data <- ovun.sample(Diverted ~ ., data = combined_train, method = 'over')
+extracted_data <- oversampled_data$data
+oversampled_df <- as.data.frame(extracted_data)
+table(oversampled_df$Diverted)
+```
+
+```{r}
+# running the logisitc regression using the resampled data
+resampled_lr <- glm(Diverted~., data=oversampled_df, family='binomial')
+summary(resampled_lr)
+```
+
+```{r}
+# getting the predictions by the model
+lr_prediction <- predict(resampled_lr, newdata = combined_test, type="response")
+lr_prediction <- ifelse(lr_prediction >= 0.5, 1, 0)
+```
+
+# confusion matrix
+```{r}
+confusionMatrix(as.factor(combined_test$Diverted), as.factor(lr_prediction), positive="1")
+```
+# ROC curve
+```{r}
+# plotting the ROC curve 
+roc_value <- roc(y_test, lr_prediction)
+roc_auc_score <- auc(roc_value)
+
+# calculating the AUC score for the model
+plot(roc_value, main = paste("ROC Curve (AUC =", round(roc_auc_score, 2), ")"))
+```
+# Visualization of the coefficients 
+```{r, fig.height = 9, fig.width = 12}
+
+par(mar = c(5, 4, 4, 2) + 6)
+
+# extracting the coefficients from the summary for plotting
+coefficients <- coef(resampled_lr)[-1]
+barplot(coefficients,horiz = TRUE, main = "Visualization of the Coefficients", xlab = "Coefficient values", las=2)
+```

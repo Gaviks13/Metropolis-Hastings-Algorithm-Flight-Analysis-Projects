@@ -1,0 +1,187 @@
+---
+title: "PART 1"
+output: html_document
+date: "2024-03-27"
+---
+# Question 01a
+```{r}
+# Initialize variables
+x_0 <- 2
+N <- 10000
+s <- 1
+sample_vector <- c()
+y_list <- c()
+
+# a function to generate a sequence of x0, x1, x2, ....., xN using an initial value x0
+random_simulator <- function(x_0, s, N) {
+  
+  for (i in 1:N) {
+    
+    # generating a random number from a normal distribution 
+    x_star <- rnorm(1, mean = x_0, sd = s)
+    f_x_star <- exp(-abs(x_star)) / 2
+    f_x_before <- exp(-abs(x_0)) / 2
+    
+    # Generating a random number from a uniform distribution between 0 and 1
+    u <- runif(1)
+    log_u <- log(u)
+    r <- f_x_star / f_x_before
+    log_r <- log(r)
+    
+    # deciding the next value of x based on the condition provided in the explained procedure
+    if (log_u < log_r) {
+      x_i <- x_star
+    } else {
+      x_i <- x_0
+    }
+    # appending the resulting value of x_i from the condition
+    sample_vector <- c(sample_vector, x_i)
+    # setting the initial value of the normal distribution as a result from the condition
+    x_0 <- x_i
+  }
+  # converting the sample vector into an array
+  sample_array <- as.array(sample_vector)
+  return(sample_array)
+}
+```
+
+```{r}
+# returns the sample array generated from running the function
+sample_array <- random_simulator(x_0, s, N)
+length(sample_array)
+```
+
+```{r}
+# calculating the coordinates required to plot the original graph f(x) so that it can be compared with the simulation
+x_min <- min(sample_array)
+x_max <- max(sample_array)
+x_array <- seq(from = x_min, to = x_max, by = 0.002)
+y_array <- sapply(x_array, function(x) (exp(-abs(x)))/2)
+
+# Checking the number of coordinates extracted for plotting using a step of 0.002
+length(x_array)
+length(y_array)
+```
+
+```{r, fig.height = 6, fig.width = 10}
+
+# plotting the histogram, kernel density with the overlayed f(x) graph for comparison
+density_values <- density(sample_array)
+
+# plotting the histogram, kernel density plot and the f(x) graph
+ggplot() +
+  geom_histogram(aes(x = sample_array, y = ..count..), binwidth = 0.125, fill = 'orange', color = 'black', alpha = 0.7) +
+  
+  geom_line(data = data.frame(x = x_array, y = y_array * length(sample_array) * 0.125), aes(x = x, y = y, color = "f(x)"), size = 1.8) +  
+  
+  geom_line(data = data.frame(x = density_values$x, y = density_values$y * length(sample_array) * 0.125), aes(x = x, y = y, color = "Kernel Density plot"), size = 1.5) +
+  
+  # re scaling the axes of the plots to compare the results of the simulation with the f(x) graph
+  scale_y_continuous(name = "Count", sec.axis = sec_axis(~./(length(sample_array) * 0.125), name = "Density or f(x)")) + 
+  labs(x = 'x values') + 
+  theme_minimal() +
+  
+  # editing the labels of the plot and the legend
+  theme(
+    text = element_text(size = 14),  
+    axis.title.x = element_text(size = 14),  
+    axis.title.y = element_text(size = 14),  
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray", size = 0.5),  # Add major grid lines
+    panel.grid.minor = element_blank() 
+  ) +
+  scale_color_manual(values = c("f(x)" = "black", "Kernel Density plot" = "blue")) 
+```
+#Monte Carlo estimates of the mean and standard deviation
+```{r}
+
+# The estimates rounded off to 3 significant figures
+
+sample_mean <- mean(sample_array)
+sample_std <- sd(sample_array)
+
+sample_mean_estimate <- signif(sample_mean, digits = 3)
+sample_std_estimate <- signif(sample_std, digits = 3)
+
+print(paste("Monte Carlo estimate of the MEAN:", sample_mean_estimate))
+print(paste("Monte Carlo estimate of the STANDARD DEVIATION:", sample_std_estimate))
+
+```
+# QUESTION 01b
+```{r}
+# initializing values
+N <- 2000
+J <- 4
+s <- 0.001
+x <- 0
+
+# initializing a vector to store the 4 different initial values for means
+# generating 4 random initial values for the mean
+
+initial_values <- runif(J)
+
+R_hat_generator <- function(x, s, N, J) {
+  
+  # Generating J chains(sequences) of each having N elements
+  chains <- lapply(initial_values, function(initial_value) random_simulator(initial_value, s, N))
+  
+  # reshaping the chains into a matrix of J by N order
+  reshaped_array <- matrix(unlist(chains), nrow = J, byrow = TRUE)
+  
+  # computes the sample mean of chain j
+  # Mj_array <- rowMeans(reshaped_array)
+  Mj_array <- apply(reshaped_array, 1, mean)
+  
+  # computes the sample variance of chain j
+  Vj_array <- apply(reshaped_array, 1, var, na.rm = TRUE)
+  
+  # computes the overall within sample variance W
+  W <- mean(Vj_array)
+  
+  # computes the overall sample mean M
+  M <- mean(Mj_array)
+  
+  # computes the between sample variance B
+  B <- var(Mj_array, na.rm = TRUE)
+  
+  # Calculates the R hat value
+  R_hat <- sqrt((B + W) / W)
+  
+  return(R_hat)
+}
+
+# generating a list of an arbitrary number of R hat values over the range of s values provided
+s_values <- seq(0.001, 1, length.out = 250)
+R_hat_list <- sapply(s_values, R_hat_generator, x = 2, N = 2000, J = 4)
+
+# checking the number of R hat values generated
+length(R_hat_list)
+```
+
+```{r}
+# R hat values generated by the function for plotting
+print(R_hat_list)
+```
+
+# Calculate the R hat for the random walk Metropolis algorithm with N = 2000, s = 0.001 and J = 4.
+```{r}
+cat("Value of R hat:", round(R_hat_list[1], 3), "\n")
+```
+```{r, fig.height = 6, fig.width = 9}
+
+# Displaying a line plot to confirm if R hat converges when s tends to 1
+
+plot(s_values, R_hat_list, type = "l", xlab = "s", ylab = "Value of R hat", main = "Analysis of Convergence on Random Walk Metropolis Algorithm",
+     col="blue", lwd=2.2, cex.lab=1.2, cex.axis =1.2, cex.main=1.5)
+
+# adding a threshold to indicate the limits of the convergence band
+threshold <- 1.05
+abline(h = threshold, col = "red", lty = "dashed", lwd = 2.5)
+
+threshold <- 1.0
+abline(h = threshold, col = "red", lty = "dashed", lwd = 2.5)
+
+# adding a legend
+legend("topright", legend = c("Convergence band between 1.00 and 1.05"),
+       col = c("red"), lty = c("dashed"), lwd = 2, text.font = 2)
+```
